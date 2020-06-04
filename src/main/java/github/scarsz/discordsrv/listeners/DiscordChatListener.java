@@ -55,6 +55,8 @@ public class DiscordChatListener extends ListenerAdapter {
         // canned responses
         for (Map.Entry<String, String> entry : DiscordSRV.getPlugin().getCannedResponses().entrySet()) {
             if (event.getMessage().getContentRaw().toLowerCase().startsWith(entry.getKey().toLowerCase())) {
+                // don't process if this isn't the primary server
+                if (DiscordSRV.config().getBoolean("SecondaryServer")) return;
                 String discordMessage = entry.getValue();
                 discordMessage = PlaceholderUtil.replacePlaceholdersToDiscord(discordMessage);
 

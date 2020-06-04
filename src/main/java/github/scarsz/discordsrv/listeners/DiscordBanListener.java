@@ -34,6 +34,9 @@ public class DiscordBanListener extends ListenerAdapter {
 
     @Override
     public void onGuildBan(GuildBanEvent event) {
+        // don't process if this isn't the primary server
+        if (DiscordSRV.config().getBoolean("SecondaryServer")) return;
+        
         UUID linkedUuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getUser().getId());
         if (linkedUuid == null) {
             DiscordSRV.debug("Not handling ban for user " + event.getUser() + " because they didn't have a linked account");
@@ -53,6 +56,9 @@ public class DiscordBanListener extends ListenerAdapter {
 
     @Override
     public void onGuildUnban(GuildUnbanEvent event) {
+        // don't process if this isn't the primary server
+        if (DiscordSRV.config().getBoolean("SecondaryServer")) return;
+        
         UUID linkedUuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getUser().getId());
         if (linkedUuid == null) {
             DiscordSRV.debug("Not handling unban for user " + event.getUser() + " because they didn't have a linked account");

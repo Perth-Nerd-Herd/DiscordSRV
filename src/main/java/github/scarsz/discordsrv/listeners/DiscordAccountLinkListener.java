@@ -35,6 +35,9 @@ public class DiscordAccountLinkListener extends ListenerAdapter {
         // don't process messages sent by the bot
         if (event.getAuthor().getId().equals(event.getJDA().getSelfUser().getId())) return;
 
+        // don't process if this isn't the primary server
+        if (DiscordSRV.config().getBoolean("SecondaryServer")) return;
+
         DiscordSRV.api.callEvent(new DiscordPrivateMessageReceivedEvent(event));
 
         String reply = DiscordSRV.getPlugin().getAccountLinkManager().process(event.getMessage().getContentRaw(), event.getAuthor().getId());
@@ -42,6 +45,9 @@ public class DiscordAccountLinkListener extends ListenerAdapter {
     }
 
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        // don't process if this isn't the primary server
+        if (DiscordSRV.config().getBoolean("SecondaryServer")) return;
+        
         // add linked role back to people when they rejoin the server
         UUID uuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getUser().getId());
         if (uuid != null) {
