@@ -154,7 +154,10 @@ public class RequireLinkModule implements Listener {
                         continue;
                     }
 
-                    Role role = DiscordUtil.getJda().getRoleById(subRoleId);
+                    Role role = null;
+                    try {
+                        role = DiscordUtil.getJda().getRoleById(subRoleId);
+                    } catch (Throwable ignored) {}
                     if (role == null) {
                         failedRoleIds++;
                         continue;
@@ -196,7 +199,7 @@ public class RequireLinkModule implements Listener {
         }
 
         DiscordSRV.info("Kicking player " + player.getName() + " for unlinking their accounts");
-        player.kickPlayer(ChatColor.translateAlternateColorCodes('&', getUnlinkedKickMessage()));
+        Bukkit.getScheduler().runTask(DiscordSRV.getPlugin(), () -> player.kickPlayer(ChatColor.translateAlternateColorCodes('&', getUnlinkedKickMessage())));
     }
 
     private boolean checkWhitelist() {
