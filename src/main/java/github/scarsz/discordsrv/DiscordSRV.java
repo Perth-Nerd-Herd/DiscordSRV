@@ -73,6 +73,7 @@ import net.kyori.text.adapter.bukkit.TextAdapter;
 import net.kyori.text.serializer.legacy.LegacyComponentSerializer;
 import okhttp3.Dns;
 import okhttp3.OkHttpClient;
+import okhttp3.internal.tls.OkHostnameVerifier;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -86,13 +87,13 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
-import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitWorker;
 import org.jetbrains.annotations.NotNull;
 import org.minidns.dnsmessage.DnsMessage;
 import org.minidns.record.Record;
@@ -104,6 +105,7 @@ import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -116,7 +118,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @SuppressWarnings({"unused", "WeakerAccess", "ConstantConditions"})
-public class DiscordSRV extends JavaPlugin implements Listener {
+public class DiscordSRV extends JavaPlugin {
 
     public static final ApiManager api = new ApiManager();
     public static boolean isReady = false;
@@ -142,7 +144,7 @@ public class DiscordSRV extends JavaPlugin implements Listener {
     @Getter private RequireLinkModule requireLinkModule;
     @Getter private PresenceUpdater presenceUpdater;
     @Getter private NicknameUpdater nicknameUpdater;
-    @Getter private AlertListener alertListener;
+    @Getter private AlertListener alertListener = null;
     @Getter private final Set<PluginHook> pluginHooks = new HashSet<>();
     @Getter private final long startTime = System.currentTimeMillis();
     @Getter private final File configFile = new File(getDataFolder(), "config.yml");
@@ -262,6 +264,8 @@ public class DiscordSRV extends JavaPlugin implements Listener {
 
     @SuppressWarnings("unchecked")
     public DiscordSRV() {
+        super();
+
         // load config
         getDataFolder().mkdirs();
         config = new DynamicConfig();
@@ -303,7 +307,7 @@ public class DiscordSRV extends JavaPlugin implements Listener {
                     .filter(lang -> lang.getCode().equalsIgnoreCase(forcedLanguage) ||
                             lang.name().equalsIgnoreCase(forcedLanguage)
                     )
-                    .findFirst().ifPresent(lang -> config.setLanguage(lang));
+                    .findFirst().ifPresent(config::setLanguage);
         }
 
         // Make discordsrv.sync.x & discordsrv.sync.deny.x permissions denied by default
@@ -353,6 +357,16 @@ public class DiscordSRV extends JavaPlugin implements Listener {
     }
 
     public void init() {
+        if (Bukkit.getPluginManager().isPluginEnabled("PlugMan")) {
+            Plugin plugMan = Bukkit.getPluginManager().getPlugin("PlugMan");
+            try {
+                List<String> ignoredPlugins = (List<String>) plugMan.getClass().getMethod("getIgnoredPlugins").invoke(plugMan);
+                if (!ignoredPlugins.contains("DiscordSRV")) {
+                    ignoredPlugins.add("DiscordSRV");
+                }
+            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException ignored) {}
+        }
+
         // check if the person is trying to use the plugin without updating to ASM 5
         try {
             File specialSourceFile = new File("libraries/net/md-5/SpecialSource/1.7-SNAPSHOT/SpecialSource-1.7-SNAPSHOT.jar");
@@ -536,12 +550,17 @@ public class DiscordSRV extends JavaPlugin implements Listener {
             DiscordSRV.error("Failed to make custom DNS client: " + e.getMessage());
         }
 
+        Optional<Boolean> noopHostnameVerifier = config().getOptionalBoolean("NoopHostnameVerifier");
         OkHttpClient httpClient = IOUtil.newHttpClientBuilder()
                 .dns(dns)
                 // more lenient timeouts (normally 10 seconds for these 3)
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .writeTimeout(20, TimeUnit.SECONDS)
+                .hostnameVerifier(noopHostnameVerifier.isPresent() && noopHostnameVerifier.get()
+                        ? (hostname, sslSession) -> true
+                        : OkHostnameVerifier.INSTANCE
+                )
                 .build();
 
         // set custom RestAction failure handler
@@ -686,6 +705,7 @@ public class DiscordSRV extends JavaPlugin implements Listener {
         // show warning if bot wasn't in any guilds
         if (jda.getGuilds().size() == 0) {
             DiscordSRV.error(LangUtil.InternalMessage.BOT_NOT_IN_ANY_SERVERS);
+            DiscordSRV.error(jda.getInviteUrl(Permission.ADMINISTRATOR));
             return;
         }
 
@@ -765,7 +785,6 @@ public class DiscordSRV extends JavaPlugin implements Listener {
         }
 
         // register events
-        Bukkit.getPluginManager().registerEvents(this, this);
         new PlayerBanListener();
         new PlayerDeathListener();
         new PlayerJoinLeaveListener();
@@ -803,7 +822,13 @@ public class DiscordSRV extends JavaPlugin implements Listener {
                 if (pluginHook.isEnabled()) {
                     DiscordSRV.info(LangUtil.InternalMessage.PLUGIN_HOOK_ENABLING.toString().replace("{plugin}", pluginHook.getPlugin().getName()));
                     Bukkit.getPluginManager().registerEvents(pluginHook, this);
-                    pluginHooks.add(pluginHook);
+                    try {
+                        pluginHook.hook();
+                        pluginHooks.add(pluginHook);
+                    } catch (Throwable t) {
+                        getLogger().severe("Failed to hook " + hookClassName);
+                        t.printStackTrace();
+                    }
                 }
             } catch (Throwable e) {
                 // ignore class not found errors
@@ -840,6 +865,27 @@ public class DiscordSRV extends JavaPlugin implements Listener {
                 return true;
             }
         });
+        if (PluginUtil.pluginHookIsEnabled("PlaceholderAPI", false)) {
+            try {
+                DiscordSRV.info(LangUtil.InternalMessage.PLUGIN_HOOK_ENABLING.toString().replace("{plugin}", "PlaceholderAPI"));
+                Bukkit.getScheduler().runTask(this, () -> {
+                    try {
+                        if (me.clip.placeholderapi.PlaceholderAPIPlugin.getInstance().getLocalExpansionManager().findExpansionByIdentifier("discordsrv").isPresent()) {
+                            getLogger().warning("The DiscordSRV PlaceholderAPI expansion is no longer required.");
+                            getLogger().warning("The expansion is now integrated in DiscordSRV.");
+                        }
+                        new github.scarsz.discordsrv.hooks.PlaceholderAPIExpansion().register();
+                    } catch (Throwable ignored) {
+                        getLogger().severe("Failed to hook into PlaceholderAPI, please check your PlaceholderAPI version");
+                    }
+                });
+            } catch (Exception e) {
+                if (!(e instanceof ClassNotFoundException)) {
+                    DiscordSRV.error("Failed to load PlaceholderAPI expansion: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
 
         // load user-defined colors
         reloadColors();
@@ -909,13 +955,16 @@ public class DiscordSRV extends JavaPlugin implements Listener {
             int cycleTime = DiscordSRV.config().getInt("GroupRoleSynchronizationCycleTime") * 20 * 60;
             if (cycleTime < 20 * 60) cycleTime = 20 * 60;
             try {
-                groupSynchronizationManager.resync(GroupSynchronizationManager.SyncDirection.AUTHORITATIVE);
+                groupSynchronizationManager.resync(GroupSynchronizationManager.SyncDirection.AUTHORITATIVE, GroupSynchronizationManager.SyncCause.TIMER);
             } catch (Exception e) {
                 error("Failed to resync\n" + ExceptionUtils.getMessage(e));
             }
             Bukkit.getPluginManager().registerEvents(groupSynchronizationManager, this);
             Bukkit.getScheduler().runTaskTimerAsynchronously(DiscordSRV.getPlugin(),
-                    () -> groupSynchronizationManager.resync(GroupSynchronizationManager.SyncDirection.TO_DISCORD),
+                    () -> groupSynchronizationManager.resync(
+                            GroupSynchronizationManager.SyncDirection.TO_DISCORD,
+                            GroupSynchronizationManager.SyncCause.TIMER
+                    ),
                     cycleTime,
                     cycleTime
             );
@@ -929,7 +978,6 @@ public class DiscordSRV extends JavaPlugin implements Listener {
         }
 
         alertListener = new AlertListener();
-        alertListener.register();
 
         // set ready status
         if (jda.getStatus() == JDA.Status.CONNECTED) {
@@ -971,6 +1019,13 @@ public class DiscordSRV extends JavaPlugin implements Listener {
 
                 // shutdown scheduler tasks
                 Bukkit.getScheduler().cancelTasks(this);
+                for (BukkitWorker activeWorker : Bukkit.getScheduler().getActiveWorkers()) {
+                    if (activeWorker.getOwner().equals(this)) {
+                        List<String> stackTrace = Arrays.stream(activeWorker.getThread().getStackTrace()).map(StackTraceElement::toString).collect(Collectors.toList());
+                        warning("a DiscordSRV scheduler task still active during onDisable: " + stackTrace.remove(0));
+                        debug(stackTrace);
+                    }
+                }
 
                 // stop alerts
                 if (alertListener != null) alertListener.unregister();
@@ -1344,6 +1399,8 @@ public class DiscordSRV extends JavaPlugin implements Listener {
                                     Integer.valueOf(hex.substring(5, 7), 16)
                             )
                     );
+                } else {
+                    DiscordSRV.debug("Invalid color hex: " + hex + " (in " + key + ".Embed.Color)");
                 }
             } else {
                 config().getOptionalInt(key + ".Embed.Color").map(Color::new).ifPresent(messageFormat::setColor);

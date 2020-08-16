@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.discordsrv</groupId>
     <artifactId>discordsrv</artifactId>
-    <version>1.19.1-SNAPSHOT</version>
+    <version>1.19.2-SNAPSHOT</version>
 
     <name>DiscordSRV</name>
     <url>https://www.spigotmc.org/resources/discordsrv.18494/</url>
@@ -155,7 +155,19 @@
                                         <include>**</include>
                                     </includes>
                                 </filter>
+                                <filter>
+                                    <artifact>br.net.fabiozumbi12.UltimateChat:UltimateFancy</artifact>
+                                    <includes>
+                                        <include>**</include>
+                                    </includes>
+                                </filter>
                             </filters>
+
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>org.spigotmc:spigot-api</exclude>
+                                </excludes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>
@@ -255,10 +267,6 @@
             <url>https://jcenter.bintray.com</url>
         </repository>
         <repository>
-            <id>sonatype</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-        </repository>
-        <repository>
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
@@ -295,9 +303,11 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-<!--            <version>1.13-R0.1-SNAPSHOT</version>-->
             <version>1.16.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
+            <!-- system scope stuff below is for convenience when needing to dig through NMS in IDE -->
+<!--            <scope>system</scope>-->
+<!--            <systemPath>${project.basedir}/craftbukkit.jar</systemPath>-->
             <exclusions>
                 <exclusion> <!-- We only use lang3 -->
                     <groupId>commons-lang</groupId>
@@ -508,18 +518,16 @@
             <scope>provided</scope>
         </dependency>
         <!-- ultimatechat -->
-<!--        <dependency>-->
-<!--            <groupId>br.net.fabiozumbi12.UltimateChat</groupId>-->
-<!--            <artifactId>UltimateChat-Spigot</artifactId>-->
-<!--            <version>1.8.9</version>-->
-<!--            <scope>provided</scope>-->
-<!--        </dependency>-->
         <dependency>
-            <groupId>br.net.fabiozumbi12</groupId>
-            <artifactId>UltimateChat</artifactId>
-            <version>1.9.0-b253</version> <!-- From Scarsz maven 3rd party, not availabe on UC's -->
-            <classifier>Universal</classifier> <!-- Nexus decided it wanted this -->
+            <groupId>br.net.fabiozumbi12.UltimateChat</groupId>
+            <artifactId>UltimateChat-Spigot</artifactId>
+            <version>1.9.1</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>br.net.fabiozumbi12.UltimateChat</groupId>
+            <artifactId>UltimateFancy</artifactId>
+            <version>LATEST</version>
         </dependency>
         <!-- venturechat -->
         <dependency>
@@ -552,8 +560,14 @@
         <!-- placeholder api -->
         <dependency>
             <groupId>me.clip</groupId>
-            <artifactId>PlaceholderAPI</artifactId>
-            <version>2.7.1</version>
+            <artifactId>placeholderapi</artifactId>
+            <version>2.10.7</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>19.0.0</version>
             <scope>provided</scope>
         </dependency>
         <!-- permissions -->
