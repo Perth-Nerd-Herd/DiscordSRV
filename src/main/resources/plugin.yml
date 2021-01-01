@@ -13,11 +13,11 @@ loadbefore: [
 ]
 softdepend: [
   # Chat plugins
-  HeroChat, Legendchat, LunaChat, TownyChat, UltimateChat, VentureChat,
+  Herochat, Legendchat, LunaChat, TownyChat, UltimateChat, VentureChat,
   # Vanish plugins
   Essentials, PhantomAdmin, SuperVanish, VanishNoPacket, PremiumVanish,
   # Misc. plugins
-  Multiverse-Core, Vault, PlaceholderAPI, mcMMO, LuckPerms, dynmap
+  Multiverse-Core, Vault, PlaceholderAPI, mcMMO, LuckPerms, dynmap, Skript
 ]
 
 commands:
@@ -56,9 +56,11 @@ permissions:
       discordsrv.setpicture: true
       discordsrv.reload: true
       discordsrv.debug: true
+      discordsrv.link.others: true
       discordsrv.linked.others: true
       discordsrv.unlink: true
       discordsrv.unlink.others: true
+      discordsrv.resync: true
       discordsrv.groupsyncwithcommands: true
   discordsrv.discord:
     description: allows access to the discord command
@@ -93,6 +95,9 @@ permissions:
   discordsrv.link:
     description: whether or not the player is able to link their Minecraft account to their Discord account
     default: true
+  discordsrv.link.others:
+    description: whether or not the player is able to link other peoples Minecraft accounts to Discord accounts
+    default: op
   discordsrv.unlink:
     description: whether or not the player is able to unlink their Minecraft account from their Discord account
     default: op

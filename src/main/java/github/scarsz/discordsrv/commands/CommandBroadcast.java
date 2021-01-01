@@ -23,6 +23,7 @@ import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.util.DiscordUtil;
 import github.scarsz.discordsrv.util.LangUtil;
 import github.scarsz.discordsrv.util.PlaceholderUtil;
+import github.scarsz.discordsrv.util.PlayerUtil;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.kyori.text.serializer.legacy.LegacyComponentSerializer;
 import org.apache.commons.lang3.ArrayUtils;
@@ -60,7 +61,7 @@ public class CommandBroadcast {
             }
             finalArgs = ArrayUtils.subarray(args, 1, args.length);
         } else {
-            target = DiscordSRV.getPlugin().getMainTextChannel();
+            target = DiscordSRV.getPlugin().getOptionalTextChannel("broadcasts");
             finalArgs = args;
         }
 
@@ -71,9 +72,14 @@ public class CommandBroadcast {
             rawMessage = PlaceholderUtil.replacePlaceholdersToDiscord(rawMessage);
             if (DiscordSRV.config().getBoolean("DiscordChatChannelTranslateMentions"))
                 rawMessage = DiscordUtil.convertMentionsFromNames(rawMessage, DiscordSRV.getPlugin().getMainGuild());
+            rawMessage = PlayerUtil.convertTargetSelectors(rawMessage, sender);
 
             if (DiscordSRV.config().getBoolean("Experiment_MCDiscordReserializer_InBroadcast")) {
-                DiscordUtil.sendMessage(target, DiscordSerializer.INSTANCE.serialize(LegacyComponentSerializer.legacy().deserialize(rawMessage)));
+                DiscordUtil.sendMessage(target, DiscordSerializer.INSTANCE.serialize(
+                        LegacyComponentSerializer.INSTANCE.deserialize(
+                                ChatColor.translateAlternateColorCodes('&', rawMessage)
+                        )
+                ));
             } else {
                 DiscordUtil.sendMessage(target, rawMessage);
             }

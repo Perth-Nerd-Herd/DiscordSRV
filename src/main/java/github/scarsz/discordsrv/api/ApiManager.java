@@ -18,16 +18,20 @@
 
 package github.scarsz.discordsrv.api;
 
+import com.google.common.collect.Sets;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.events.Event;
 import github.scarsz.discordsrv.util.LangUtil;
-import org.apache.commons.lang3.exception.ExceptionUtils;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * <p>The manager of all of DiscordSRV's API related functionality.</p>
@@ -43,12 +47,31 @@ import java.util.List;
  * @see #subscribe(Object) subscribe listener
  * @see #unsubscribe(Object) unsubscribe listener
  * @see #callEvent(Event) call an event
+ * @see #requireIntent(GatewayIntent)
+ * @see #requireCacheFlag(CacheFlag)
  */
 @SuppressWarnings("unused")
 public class ApiManager {
 
     private List<Object> apiListeners = new ArrayList<>();
     private boolean anyHooked = false;
+
+    private final EnumSet<GatewayIntent> intents = EnumSet.of(
+            // required for DiscordSRV's use
+            GatewayIntent.GUILD_MEMBERS,
+            GatewayIntent.GUILD_BANS,
+            GatewayIntent.GUILD_EMOJIS,
+            GatewayIntent.GUILD_VOICE_STATES,
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.DIRECT_MESSAGES
+    );
+
+    private final EnumSet<CacheFlag> cacheFlags = EnumSet.of(
+            // required for DiscordSRV's use
+            CacheFlag.MEMBER_OVERRIDES,
+            CacheFlag.VOICE_STATE,
+            CacheFlag.EMOTE
+    );
 
     /**
      * Subscribe the given instance to DiscordSRV events
@@ -59,7 +82,7 @@ public class ApiManager {
         // ensure at least one method available in given object that is annotated with Subscribe
         int methodsAnnotatedSubscribe = 0;
         for (Method method : listener.getClass().getMethods()) if (method.isAnnotationPresent(Subscribe.class)) methodsAnnotatedSubscribe++;
-        if (methodsAnnotatedSubscribe == 0) throw new RuntimeException(listener.getClass().getName() + " attempted DiscordSRV API registration but no methods inside of it were annotated @Subscribe (github.scarsz.discordsrv.api.Subscribe)");
+        if (methodsAnnotatedSubscribe == 0) throw new RuntimeException(listener.getClass().getName() + " attempted DiscordSRV API registration but no public methods inside of it were annotated @Subscribe (github.scarsz.discordsrv.api.Subscribe)");
 
         DiscordSRV.info(LangUtil.InternalMessage.API_LISTENER_SUBSCRIBED.toString()
                 .replace("{listenername}", listener.getClass().getName())
@@ -106,14 +129,17 @@ public class ApiManager {
                         try {
                             method.invoke(apiListener, event);
                         } catch (InvocationTargetException e) {
-                            DiscordSRV.error((LangUtil.InternalMessage.API_LISTENER_THREW_ERROR + ":\n" + ExceptionUtils.getStackTrace(e))
-                                    .replace("{listenername}", apiListener.getClass().getName())
-                            );
+                            DiscordSRV.error(
+                                    LangUtil.InternalMessage.API_LISTENER_THREW_ERROR.toString()
+                                            .replace("{listenername}", apiListener.getClass().getName()),
+                                    e.getCause());
                         } catch (IllegalAccessException e) {
                             // this should never happen
-                            DiscordSRV.error((LangUtil.InternalMessage.API_LISTENER_METHOD_NOT_ACCESSIBLE + ":\n" + ExceptionUtils.getStackTrace(e))
-                                    .replace("{listenername}", apiListener.getClass().getName())
-                                    .replace("{methodname}", method.toString())
+                            DiscordSRV.error(
+                                    LangUtil.InternalMessage.API_LISTENER_METHOD_NOT_ACCESSIBLE.toString()
+                                            .replace("{listenername}", apiListener.getClass().getName())
+                                            .replace("{methodname}", method.toString()),
+                                    e
                             );
                         }
                     }
@@ -125,7 +151,54 @@ public class ApiManager {
     }
 
     /**
-     * Internal method to see if anything has hooked to DiscordSRV's API
+     * <b>This must be executed before DiscordSRV's JDA is ready! (before DiscordSRV enables fully)</b><br/>
+     * Some information will not be sent to us by Discord if not requested,
+     * you can use this method to enable a gateway intent.
+     *
+     * <br/><br/>
+     * Please not that DiscordSRV already uses some intents by default: {@link ApiManager#intents}.
+     *
+     * @throws IllegalStateException if this is executed after JDA was already initialized
+     */
+    public void requireIntent(GatewayIntent gatewayIntent) {
+        if (DiscordSRV.getPlugin().getJda() != null) throw new IllegalStateException("Intents must be required before JDA initializes");
+        intents.add(gatewayIntent);
+    }
+
+    /**
+     * <b>This must be executed before DiscordSRV's JDA is ready! (before DiscordSRV enables fully)</b><br/>
+     * Some information will not be stored unless indicated,
+     * you can use this method to enable a cache.
+     *
+     * <br/><br/>
+     * Please note that DiscordSRV already uses some caches by default: {@link ApiManager#cacheFlags}.
+     *
+     * @throws IllegalStateException if this is executed after JDA was already initialized
+     */
+    public void requireCacheFlag(CacheFlag cacheFlag) {
+        if (DiscordSRV.getPlugin().getJda() != null) throw new IllegalStateException("Cache flags must be required before JDA initializes");
+        cacheFlags.add(cacheFlag);
+    }
+
+    /**
+     * Returns a immutable set of gateway intents DiscordSRV should use to initialize JDA.
+     * @see ApiManager#requireIntent(GatewayIntent)
+     */
+    public Set<GatewayIntent> getIntents() {
+        return Sets.immutableEnumSet(intents);
+    }
+
+    /**
+     * Returns a immutable set of cache flags DiscordSRV should use to initialize JDA.
+     * @see ApiManager#requireCacheFlag(CacheFlag)
+     */
+    public Set<CacheFlag> getCacheFlags() {
+        return Sets.immutableEnumSet(cacheFlags);
+    }
+
+    /**
+     * Returns true if <b>anything</b> has hooked into DiscordSRV's event bus.
+     * Used internally in DiscordSRV.
      */
     public boolean isAnyHooked() {
         return anyHooked;

@@ -23,8 +23,8 @@
 #
 # DiscordToMinecraftAllRolesSeparator: %allroles%에서 사용되는 Roles의 구분 기호 입니다.
 #
-DiscordToMinecraftChatMessageFormat: "[&bDiscord &r| %toprolecolor%%toprole%&r] %username% » %message%"
-DiscordToMinecraftChatMessageFormatNoRole: "[&bDiscord&r] %username% » %message%"
+DiscordToMinecraftChatMessageFormat: "[&bDiscord &r| %toprolecolor%%toprole%&r] %name% » %message%"
+DiscordToMinecraftChatMessageFormatNoRole: "[&bDiscord&r] %name% » %message%"
 DiscordToMinecraftAllRolesSeparator: " | "
 
 # Minecraft -> Discord 메세지
@@ -37,6 +37,10 @@ DiscordToMinecraftAllRolesSeparator: " | "
 # %username%:     플레이어 이름
 #                  example: jeb_
 # %displayname%:  표시되는 이름 (닉네임)
+#                  example: BigBossManJeb
+# %usernamenoescapes%:     불일치 형식을 이스케이프하지 않은 플레이어 이름 (인라인 코드 및 코드 블록 마크 다운에 사용)
+#                  example: jeb_
+# %displaynamenoescapes%:  불일치 형식을 이스케이프하지 않은 표시되는 이름 (닉네임) (인라인 코드 및 코드 블록 마크 다운에 사용)
 #                  example: BigBossManJeb
 # %message%:      메세지 내용
 #                  example: Hello!
@@ -101,8 +105,14 @@ DynmapDiscordFormat: "[Dynmap] %name% » %message%"
 #           예제: INFO, WARN, ERROR
 # %line%:  콘솔 메세지
 #           예제: [DiscordSRV] Enabling DiscordSRV vX.Y
+# PlaceholderAPI 변수(Placeholder) 또한 지원됩니다.
+#
+# DiscordConsoleChannelMessagePrefix: 배치 라인 앞에 붙일 리터럴 접두사.
+# DiscordConsoleChannelMessageSuffix: 일괄 처리 행에 추가 할 리터럴 접미사입니다.
 #
 DiscordConsoleChannelFormat: "[%date% %level%] %line%"
+DiscordConsoleChannelMessagePrefix: ""
+DiscordConsoleChannelMessageSuffix: ""
 
 # Discord 채팅 채널 !c 명령어 오류 메게지
 # 사용자가 권한이 부족할 경우 발생하는 오류 메세지에 대해 설정합니다. 그 이외의 오류는 여기서 설정하는 것이 아닙니다.
@@ -144,7 +154,7 @@ DiscordChatChannelListCommandAllPlayersSeparator: ", "
 # Fields:     형식은 "표제;값;inline" (예 "누가 합류 했습니까?;%displayname%;true") 빈 필드를 추가하려면"blank"또는
 # Timestamp:  메시지가 전송 된 시간을 사용하거나 특정 시간 동안 에포크 시간 소인을 사용하려면 true로 설정하십시오. (https://www.epochconverter.com/)
 #
-# PlayerJoin/PlayerFirstJoin/PlayerLeave/PlayerDeath에 사용 가능한 자리 표시 자:
+# PlayerJoin/PlayerFirstJoin/PlayerLeave/PlayerDeath/PlayerAchievement에 사용 가능한 자리 표시 자:
 # %displayname%:         플레이어의 보여지는 이름 (에센셜 닉네임 등)
 # %username%:            플레이어 실제 닉네임
 # %date%:                현재 날짜 및 시간
@@ -164,6 +174,7 @@ MinecraftPlayerJoinMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#00ff00"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -192,6 +203,7 @@ MinecraftPlayerFirstJoinMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#ffd700"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -220,6 +232,7 @@ MinecraftPlayerLeaveMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#ff0000"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -249,6 +262,7 @@ MinecraftPlayerDeathMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#000000"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -265,19 +279,36 @@ MinecraftPlayerDeathMessage:
       Text: ""
       IconUrl: ""
     Timestamp: false
-
-# Minecraft -> Discord 도전과제 메세지
 #
-# 사용가능한 변수들:
+# PlayerAchievement 메시지에 사용 가능한 자리 표시 자 :
 # %achievement%: 서버상의 도전과제 메세지 내용
-# %displayname%:  플레이어의 보여지는 이름
-# %username%:     플레이어 실제 닉네임
 # %world%:       플레이어의 현재 월드
-# %worldalias%:   Multiverse-Core에서 사용하는 월드 이름의 약어(alias)
-# %date%:        현재 시각 및 날짜
-# PlaceholderAPI 변수(placeholders) 또한 지원됩니다.
 #
-MinecraftPlayerAchievementMessagesFormat: ":medal: **%displayname%이(가) %achievement% 발전 과제를 달성했습니다!**"
+MinecraftPlayerAchievementMessage:
+  Enabled: true
+  Webhook:
+    Enable: false
+    AvatarUrl: "%botavatarurl%"
+    Name: "%botname%"
+  Content: ""
+  Embed:
+    Enabled: true
+    Color: "#ffd700"
+    Author:
+      ImageUrl: "%embedavatarurl%"
+      Name: "%displayname%이(가) %achievement% 발전 과제를 달성했습니다!"
+      Url: ""
+    ThumbnailUrl: ""
+    Title:
+      Text: ""
+      Url: ""
+    Description: ""
+    Fields: []
+    ImageUrl: ""
+    Footer:
+      Text: ""
+      IconUrl: ""
+    Timestamp: false
 
 # 채널 토픽 업데이트 메세지
 # 여기에서는 채널 토픽 업데이트에 관련된 내용을 설정 하실 수 있습니다.
@@ -305,7 +336,7 @@ MinecraftPlayerAchievementMessagesFormat: ":medal: **%displayname%이(가) %achi
 # %tps%:           평균 TPS
 # PlaceholderAPI 변수(Placeholder) 또한 지원됩니다.
 #
-ChannelTopicUpdaterChatChannelTopicFormat: "%playercount%/%playermax% 플레이어 온라인 | 총 접속다자 %totalplayers% 명 | 서버 업타임 %uptimemins% 분 | 마지막 업데이트 : %date%"
+ChannelTopicUpdaterChatChannelTopicFormat: "%playercount%/%playermax% 플레이어 온라인 | 총 접속자 %totalplayers% 명 | 서버 업타임 %uptimemins% 분 | 마지막 업데이트 : %date%"
 ChannelTopicUpdaterConsoleChannelTopicFormat: "TPS: %tps% | Mem: %usedmemorygb%GB 사용중/%freememorygb%GB 사용가능/%maxmemorygb%GB 최대 할당 가능| %serverversion%"
 # AtServerShutdownFormats는 %totalplayers%, %serverversion%, %date%, %time% 만 지원합니다.
 ChannelTopicUpdaterChatChannelTopicAtServerShutdownFormat: "서버 오프라인 | 총 접속자 %totalplayers% 명"
@@ -315,7 +346,13 @@ ChannelTopicUpdaterConsoleChannelTopicAtServerShutdownFormat: "서버 오프라�
 # "/discord" 실행시 뜨는 메세지를 결정합니다. (되도록이면 없애지 마세요)
 # 사람들이 Discord 서버에 가입해야하는 초대 링크의 자리 표시 자로 {INVITE}를 사용하고 config.yml에 구성된 DiscordInviteLink를 사용하십시오.
 #
-DiscordCommandFormat: "&b저희 서버 디스코드에 들어와 주세요! {INVITE}. 명령어에 사용법은 \"/discord ?\" 를 확인해 주세요!"
+DiscordCommandFormat: "&b서버 디스코드에 들어와 주세요! {INVITE}. 명령어에 사용법은 \"/discord ?\" 를 확인해 주세요!"
+
+# 권한 메시지 형식 없음
+NoPermissionMessage: "&c이 명령어를 실행할 권한이 없습니다."
+
+# 알 수없는 명령 메시지
+UnknownCommandMessage: "&b그런 명령어는 없습니다!"
 
 # 서버 시작/종료 메세지
 # DiscordChatChannelServerStartupMessage: 서버 시작시 보낼 메세지를 정합니다. (빈칸 : 비활성화
@@ -334,21 +371,40 @@ DiscordChatChannelServerShutdownMessage: ":octagonal_sign: **서버가 종료되
 #                        서버 주인장을 "%guildowner%" 를 통해 호출 할 수 있습니다.
 #                        %date% 를 통해 서버 다운시 시간을 확인 할 수 있습니다.
 #
-ServerWatchdogMessage: "`%date%` %guildowner%, 서버실이 :fire: 타고 있습니다! :bangbang:"
+ServerWatchdogMessage: "`%date%` %guildowner%, 서버가 :fire: 타고 있습니다! :bangbang:"
 
 # 계정 연동 메세지
 # 이 메세지들은 계정 연동시에 사용 됩니다.
 #
 # 사용 가능한 변수:
-# CodeGenerated:          %code%:         생성된 코드 입니다.
-#                         %botname%:      디스코드 상의 봇의 이름입니다.
-# DiscordAccountLinked:   %name%:         연동할 마인크래프트 플레이어 이름입니다.
-#                         %displayname%:  사용자의 Discord 계정이 연결된 Minecraft 플레이어의 표시 이름
-#                         %uuid%:         연동할 마인크래프트 플레이어 UUID입니다.
-# MinecraftAccountLinked: %id%:           연동할 플레이어의 Discord ID입니다.
-#                         %username%:     연동할 플레이어의 Discord 상의 사용자 이름입니다
+# CodeGenerated:                %code%:         생성된 코드 입니다.
+#                               %botname%:      디스코드 상의 봇의 이름입니다.
+# DiscordAccountLinked:         %name%:         연동할 마인크래프트 플레이어 이름입니다.
+#                               %displayname%:  사용자의 Discord 계정이 연결된 Minecraft 플레이어의 표시 이름
+#                               %uuid%:         연동할 마인크래프트 플레이어 UUID입니다.
+# DiscordAccountAlreadyLinked:  %uuid%:         사용자의 연결된 Minecraft 계정의 Minecraft uuid
+#                               %username%:     사용자의 연결된 Minecraft 계정의 Minecraft 사용자 이름
+# DiscordLinkedAccountRequired  %message%:      사용자가 연결되지 않았기 때문에 보낼 수없는 메시지
+# MinecraftAccountLinked:       %id%:           연동할 플레이어의 Discord ID입니다.
+#                               %username%:     연동할 플레이어의 Discord 상의 사용자 이름입니다
+# LinkedCommandSuccess:         %name%:         사용자의 Minecraft 계정이 연결된 Discord 사용자의 discord 사용자 이름
+# UnlinkCommandSuccess:         %name%:         사용자의 Minecraft 계정이 연결된 Discord 사용자의 discord 사용자 이름
+# MinecraftNobodyFound:         %target%:       결과를 찾을 수없는 입력
 #
+# Discord
 CodeGenerated: "링크 코드는 %code% 입니다. 봇(%botname%)에게 개인 메세지로 해당 코드를 보내주세요!"
+UnknownCode: "그런 코드는 발급한 적 없습니다, 다시 시도 해 주세요."
+InvalidCode: "코드가 올바르지 않습니다. 코드는 4자리 숫자로 구성 되어 있습니다."
+DiscordAccountLinked:  "마인크래프트 계정 %name%(%uuid%)과 연결되었습니다!"
+DiscordAccountAlreadyLinked: "이미 %username%(%uuid%) 에 연결되어 있습니다"
+DiscordLinkedAccountRequired: "이 서버는 게임채팅에 말하려면 당신의 마인크래프트 계정을 디스코드에 연동해야 합니다.1 연동 방법 : `/discord link`. \n```%message%```"
+DiscordLinkedAccountCheckFailed: "계정이 연결되어 있는지 확인할 수 없습니다. 나중에 다시 시도하십시오"
+# Minecraft
 ClickToCopyCode: "클릭하여 복사"
-DiscordAccountLinked: "%name% (UUID : %uuid%)의 연동이 성공하였습니다!"
-MinecraftAccountLinked: "&b당신의 UUID 는 Discord 사용자 %username% (%id%) 에게 연동되었습니다!"
+MinecraftAccountLinked: "&b디스코드 계정 %username%(%id%)와 연동되었습니다!"
+MinecraftAccountAlreadyLinked: "&b당신의 마인크래프트 계정은 디스코드 계정과 이미 연결되어 있습니다."
+LinkedCommandSuccess: "&b당신의 마인크래프트 계정은 디스코드 계정 %name%과 연결되어 있습니다."
+UnlinkCommandSuccess: "&b당신의 마인크래프트 계정은 더 이상 %name%과 연결되어있지 않습니다."
+MinecraftNoLinkedAccount: "&c당신의 마인크래프트 계정은 디스코드 계정과 연결되어있지 않습니다."
+LinkingError: "&c서버 내부 오류로 인해 계정을 연결할 수 없습니다. 서버 관리팀을 불러주세요!"
+MinecraftNobodyFound: "&c\"%target%\"을 만족하는 Discord ID/Discord name/Minecraft name/Minecraft UUID 가 없습니다."

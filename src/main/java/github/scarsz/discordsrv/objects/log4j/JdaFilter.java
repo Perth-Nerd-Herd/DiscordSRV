@@ -35,8 +35,21 @@ public class JdaFilter implements Filter {
 
         switch (level.name()) {
             case "INFO": DiscordSRV.info("[JDA] " + message); break;
-            case "WARN": DiscordSRV.warning("[JDA] " + message); break;
+            case "WARN":
+                if (message.contains("Encountered 429")) {
+                    DiscordSRV.debug(message);
+                    break;
+                }
+
+                DiscordSRV.warning("[JDA] " + message);
+                break;
             case "ERROR":
+                if (message.contains("Requester timed out while executing a request")) {
+                    DiscordSRV.error("[JDA] " + message + ". This is either a issue on Discord's end (https://discordstatus.com) or with your server's connection");
+                    DiscordSRV.debug(ExceptionUtils.getStackTrace(throwable));
+                    break;
+                }
+
                 if (throwable != null) {
                     DiscordSRV.error("[JDA] " + message + "\n" + ExceptionUtils.getStackTrace(throwable));
                 } else {

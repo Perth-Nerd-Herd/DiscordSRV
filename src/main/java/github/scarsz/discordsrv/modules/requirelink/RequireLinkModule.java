@@ -18,8 +18,10 @@
 
 package github.scarsz.discordsrv.modules.requirelink;
 
+import alexh.weak.Dynamic;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.util.DiscordUtil;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import org.apache.commons.lang3.StringUtils;
@@ -65,13 +67,27 @@ public class RequireLinkModule implements Listener {
                     return;
                 }
             }
-            if (Bukkit.getServer().getBannedPlayers().stream().anyMatch(p -> p.getUniqueId().equals(playerUuid))) {
-                DiscordSRV.debug("Player " + playerName + " is banned, skipping linked check");
-                return;
-            }
-            if (Bukkit.getServer().getIPBans().stream().anyMatch(ip::equals)) {
-                DiscordSRV.debug("Player " + playerName + " connecting with banned IP " + ip + ", skipping linked check");
-                return;
+            boolean onlyCheckBannedPlayers = onlyCheckBannedPlayers();
+            if (!checkBannedPlayers() || onlyCheckBannedPlayers) {
+                boolean banned = false;
+                if (Bukkit.getServer().getBannedPlayers().stream().anyMatch(p -> p.getUniqueId().equals(playerUuid))) {
+                    if (!onlyCheckBannedPlayers) {
+                        DiscordSRV.debug("Player " + playerName + " is banned, skipping linked check");
+                        return;
+                    }
+                    banned = true;
+                }
+                if (!banned && Bukkit.getServer().getIPBans().stream().anyMatch(ip::equals)) {
+                    if (!onlyCheckBannedPlayers) {
+                        DiscordSRV.debug("Player " + playerName + " connecting with banned IP " + ip + ", skipping linked check");
+                        return;
+                    }
+                    banned = true;
+                }
+                if (onlyCheckBannedPlayers && !banned) {
+                    DiscordSRV.debug("Player " + playerName + " is bypassing link requirement because \"Only check banned players\" is enabled");
+                    return;
+                }
             }
 
             if (!DiscordSRV.isReady) {
@@ -98,6 +114,49 @@ public class RequireLinkModule implements Listener {
                 return;
             }
 
+            Dynamic mustBeInDiscordServerOption = DiscordSRV.config().dget("Require linked account to play.Must be in Discord server");
+            if (mustBeInDiscordServerOption.is(Boolean.class)) {
+                boolean mustBePresent = mustBeInDiscordServerOption.as(Boolean.class);
+                boolean isPresent = DiscordUtil.getMemberById(discordId) != null;
+                if (mustBePresent && !isPresent) {
+                    disallow.accept(
+                            AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST.name(),
+                            ChatColor.translateAlternateColorCodes('&', DiscordSRV.config().getString("Require linked account to play.Messages.Not in server"))
+                                    .replace("{INVITE}", DiscordSRV.config().getString("DiscordInviteLink"))
+                    );
+                    return;
+                }
+            } else {
+                Set<String> targets = new HashSet<>();
+
+                if (mustBeInDiscordServerOption.isList()) {
+                    mustBeInDiscordServerOption.children().forEach(dynamic -> targets.add(dynamic.toString()));
+                } else {
+                    targets.add(mustBeInDiscordServerOption.convert().intoString());
+                }
+
+                for (String guildId : targets) {
+                    try {
+                        Guild guild = DiscordUtil.getJda().getGuildById(guildId);
+                        if (guild != null) {
+                            boolean inServer = guild.getMemberById(discordId) != null;
+                            if (!inServer) {
+                                disallow.accept(
+                                        AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST.name(),
+                                        ChatColor.translateAlternateColorCodes('&', DiscordSRV.config().getString("Require linked account to play.Messages.Not in server"))
+                                                .replace("{INVITE}", DiscordSRV.config().getString("DiscordInviteLink"))
+                                );
+                                return;
+                            }
+                        } else {
+                            DiscordSRV.debug("Failed to get Discord server by ID " + guildId + ": bot is not in server");
+                        }
+                    } catch (NumberFormatException e) {
+                        DiscordSRV.debug("Failed to get Discord server by ID " + guildId + ": not a parsable long");
+                    }
+                }
+            }
+
             List<String> subRoleIds = DiscordSRV.config().getStringList("Require linked account to play.Subscriber role.Subscriber roles");
             if (isSubRoleRequired() && !subRoleIds.isEmpty()) {
                 int failedRoleIds = 0;
@@ -109,7 +168,10 @@ public class RequireLinkModule implements Listener {
                         continue;
                     }
 
-                    Role role = DiscordUtil.getJda().getRoleById(subRoleId);
+                    Role role = null;
+                    try {
+                        role = DiscordUtil.getJda().getRoleById(subRoleId);
+                    } catch (Throwable ignored) {}
                     if (role == null) {
                         failedRoleIds++;
                         continue;
@@ -122,7 +184,7 @@ public class RequireLinkModule implements Listener {
                 }
 
                 if (failedRoleIds == subRoleIds.size()) {
-                    DiscordSRV.error("Tried to authenticate " + playerName + " but no valid subscriber role IDs are found and that's a requirement; login will be denied until this is fixed.");
+                    DiscordSRV.error("Tried to authenticate " + playerName + " but no valid subscriber role IDs are found and thats a requirement; login will be denied until this is fixed.");
                     disallow.accept(AsyncPlayerPreLoginEvent.Result.KICK_OTHER.name(), ChatColor.translateAlternateColorCodes('&', getFailedToFindRoleKickMessage()));
                     return;
                 }
@@ -133,8 +195,7 @@ public class RequireLinkModule implements Listener {
                 }
             }
         } catch (Exception exception) {
-            DiscordSRV.error("Failed to check player: " + playerName);
-            exception.printStackTrace();
+            DiscordSRV.error("Failed to check player: " + playerName, exception);
             disallow.accept(AsyncPlayerPreLoginEvent.Result.KICK_OTHER.name(), ChatColor.translateAlternateColorCodes('&', getUnknownFailureKickMessage()));
         }
     }
@@ -149,13 +210,24 @@ public class RequireLinkModule implements Listener {
                 return;
             }
         }
+        String ip = player.getAddress().getAddress().getHostAddress();
+        if (onlyCheckBannedPlayers() && !Bukkit.getServer().getBannedPlayers().stream().anyMatch(p -> p.getUniqueId().equals(player.getUniqueId())) && !Bukkit.getServer().getIPBans().stream().anyMatch(ip::equals)) {
+            DiscordSRV.debug("Player " + player.getName() + " is bypassing link requirement because \"Only check banned players\" is enabled");
+            return;
+        }
 
         DiscordSRV.info("Kicking player " + player.getName() + " for unlinking their accounts");
-        player.kickPlayer(ChatColor.translateAlternateColorCodes('&', getUnlinkedKickMessage()));
+        Bukkit.getScheduler().runTask(DiscordSRV.getPlugin(), () -> player.kickPlayer(ChatColor.translateAlternateColorCodes('&', getUnlinkedKickMessage())));
     }
 
     private boolean checkWhitelist() {
         return DiscordSRV.config().getBoolean("Require linked account to play.Whitelisted players bypass check");
+    }
+    private boolean checkBannedPlayers() {
+        return DiscordSRV.config().getBoolean("Require linked account to play.Check banned players");
+    }
+    private boolean onlyCheckBannedPlayers() {
+        return DiscordSRV.config().getBoolean("Require linked account to play.Only check banned players");
     }
     private boolean getAllSubRolesRequired() {
         return DiscordSRV.config().getBoolean("Require linked account to play.Subscriber role.Require all of the listed roles");

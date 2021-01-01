@@ -23,6 +23,7 @@ import github.scarsz.discordsrv.util.DiscordUtil;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
+import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.conversations.Conversation;
 import org.bukkit.conversations.ConversationAbandonedEvent;
@@ -31,8 +32,10 @@ import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Set;
 
+@SuppressWarnings("NullableProblems")
 public class SingleCommandSender implements ConsoleCommandSender {
 
     private GuildMessageReceivedEvent event;
@@ -127,7 +130,7 @@ public class SingleCommandSender implements ConsoleCommandSender {
         // expire request message after specified time
         if (!alreadyQueuedDelete && DiscordSRV.config().getInt("DiscordChatChannelConsoleCommandExpiration") > 0 && DiscordSRV.config().getBoolean("DiscordChatChannelConsoleCommandExpirationDeleteRequest")) {
             Bukkit.getScheduler().runTaskAsynchronously(DiscordSRV.getPlugin(), () -> {
-                try { Thread.sleep(DiscordSRV.config().getInt("DiscordChatChannelConsoleCommandExpiration") * 1000); } catch (InterruptedException e) { e.printStackTrace(); }
+                try { Thread.sleep(DiscordSRV.config().getInt("DiscordChatChannelConsoleCommandExpiration") * 1000L); } catch (InterruptedException ignored) {}
                 event.getMessage().delete().queue();
                 alreadyQueuedDelete = true;
             });
@@ -170,4 +173,13 @@ public class SingleCommandSender implements ConsoleCommandSender {
         sender.sendRawMessage(arg0);
     }
 
+    @SuppressWarnings("ConstantConditions")
+    public org.bukkit.command.ConsoleCommandSender.Spigot spigot() {
+        try {
+            return (org.bukkit.command.ConsoleCommandSender.Spigot) CommandSender.class.getMethod("spigot").invoke(sender);
+        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            DiscordSRV.error(e);
+            return null;
+        }
+    }
 }

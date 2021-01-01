@@ -23,8 +23,8 @@
 #
 # DiscordToMinecraftAllRolesSeparator: Het teken dat gebruikt wordt om meerdere 'roles' uitelkaar te houden.
 #
-DiscordToMinecraftChatMessageFormat: "[&bDiscord &r| %toprolecolor%%toprole%&r] %username% » %message%"
-DiscordToMinecraftChatMessageFormatNoRole: "[&bDiscord&r] %username% » %message%"
+DiscordToMinecraftChatMessageFormat: "[&bDiscord &r| %toprolecolor%%toprole%&r] %name% » %message%"
+DiscordToMinecraftChatMessageFormatNoRole: "[&bDiscord&r] %name% » %message%"
 DiscordToMinecraftAllRolesSeparator: " | "
 
 # Minecraft -> Discord Bericht
@@ -37,6 +37,12 @@ DiscordToMinecraftAllRolesSeparator: " | "
 #                  Bijvoorbeeld: jeb_
 # %displayname%:  De spelers Nickname als die ingesteld is.
 #                  Bijvoorbeeld: BigBossManJeb
+# %usernamenoescapes%:     De spelers username zonder te ontsnappen aan het discord-formaat (voor gebruik in inline code & codeblok markdown)
+
+#                  example: jeb_
+# %displaynamenoescapes%:  De spelers Nickname als die ingesteld is zonder te ontsnappen aan het discord-formaat (voor gebruik in inline code & codeblok markdown)
+
+#                  example: BigBossManJeb
 # %message%:      Het bericht van de persoon.
 #                  Bijvoorbeeld: Hello!
 # %primarygroup%: De naam van de hoogste groep van de persoon.
@@ -101,8 +107,14 @@ DynmapDiscordFormat: "[Dynmap] %name% » %message%"
 #           Bijvoorbeeld: INFO, WARN, ERROR
 # %line%:  Bericht uit de console
 #           Bijvoorbeeld: [DiscordSRV] Enabling DiscordSRV vX.Y
+# PlaceholderAPI placeholders zijn ook ondersteund
+#
+# DiscordConsoleChannelMessagePrefix: Het letterlijke voorvoegsel dat moet worden toegevoegd aan een reeks regels.
+# DiscordConsoleChannelMessageSuffix: Het letterlijke achtervoegsel om aan een reeks regels toe te voegen.
 #
 DiscordConsoleChannelFormat: "[%date% %level%] %line%"
+DiscordConsoleChannelMessagePrefix: ""
+DiscordConsoleChannelMessageSuffix: ""
 
 # Discord Chat kanaal !c command error bericht
 # Wordt gebruikt als er een error is met de permissies van de speler die de commands gebruikt, niet een error met de commands zelf.
@@ -144,7 +156,7 @@ DiscordChatChannelListCommandAllPlayersSeparator: ", "
 # Fields:     format is "title;value;inline" (b.v. "Who joined?;%displayname%;true") of "leeg" om een leeg veld toe te voegen
 # Timestamp:  ingesteld op true om de tijd te gebruiken waarop het bericht is verzonden of gebruik een tijdstempel voor een bepaalde tijd (https://www.epochconverter.com/)
 #
-# Beschikbare tijdelijke aanduidingen voor PlayerJoin/PlayerFirstJoin/PlayerLeave/PlayerDeath:
+# Beschikbare tijdelijke aanduidingen voor PlayerJoin/PlayerFirstJoin/PlayerLeave/PlayerDeath/PlayerAchievement:
 # %displayname%:         De spelers Nickname als die ingesteld is.
 # %username%:            Alleen de spelers username.
 # %date%:                Huidige datum en tijd.
@@ -164,6 +176,7 @@ MinecraftPlayerJoinMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#00ff00"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -192,6 +205,7 @@ MinecraftPlayerFirstJoinMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#ffd700"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -220,6 +234,7 @@ MinecraftPlayerLeaveMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#ff0000"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -249,6 +264,7 @@ MinecraftPlayerDeathMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#000000"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -265,19 +281,36 @@ MinecraftPlayerDeathMessage:
       Text: ""
       IconUrl: ""
     Timestamp: false
-
-# Minecraft -> Discord achievement berichten
 #
-# Beschikbare 'placeholders':
+# Beschikbare tijdelijke aanduidingen voor PlayerAchievement-berichten:
 # %achievement%: avhievment bericht.
-# %displayname%: De spelers Nickname als die ingesteld is.
-# %username%:    Alleen de spelers username.
 # %world%:       De naam van de wereld waar de speler in zit.
-# %worldalias%:   alias van de wereldwaar de speler in zir via Multiverse-Core.
-# %date%:        Huidige datum en tijd.
-# PlaceholderAPI placeholders zijn ook ondersteund
 #
-MinecraftPlayerAchievementMessagesFormat: ":medal: **%displayname% heeft vooruitgang %achievement% behaald!**"
+MinecraftPlayerAchievementMessage:
+  Enabled: true
+  Webhook:
+    Enable: false
+    AvatarUrl: "%botavatarurl%"
+    Name: "%botname%"
+  Content: ""
+  Embed:
+    Enabled: true
+    Color: "#ffd700"
+    Author:
+      ImageUrl: "%embedavatarurl%"
+      Name: "%displayname% heeft vooruitgang %achievement% behaald!"
+      Url: ""
+    ThumbnailUrl: ""
+    Title:
+      Text: ""
+      Url: ""
+    Description: ""
+    Fields: []
+    ImageUrl: ""
+    Footer:
+      Text: ""
+      IconUrl: ""
+    Timestamp: false
 
 # Channel 'topic' updater berichten
 # Dit is alles dat te maken heeft met het automatisch updaten van de 'topic's van de console en chat kanalen.
@@ -317,6 +350,12 @@ ChannelTopicUpdaterConsoleChannelTopicAtServerShutdownFormat: "Server is offline
 #
 DiscordCommandFormat: "&bJoin ons in Discord op {INVITE}. voor commando hulp, doe \"/discord ?\""
 
+# Geen toestemmingsberichtformaat
+NoPermissionMessage: "&cHet formaat van het toestemmingsbericht ontbreekt"
+
+# Onbekend opdrachtbericht
+UnknownCommandMessage: "&bDat command bestaat niet!"
+
 # Server startup/shutdown berichten
 # DiscordChatChannelServerStartupMessage: Bericht om te versturen als de server start, leeg laten om het uit te schakelen.
 # DiscordChatChannelServerShutdownMessage: Bericht om te versturen als de server stopt, leeg laten om het uit te schakelen.
@@ -341,15 +380,34 @@ ServerWatchdogMessage: "`%date%` %guildowner%, de server ruimte staat in de :fir
 # Dit zijn de berichten die je ziet als de account gekoppeld zijn.
 #
 # Beschikbare 'placeholders':
-# CodeGenerated:          %code%:         De code dat gegenereerd wordt voor de speler om zijn account te koppelen.
-#                         %botname%:      De naam van de bot in Discord.
-# DiscordAccountLinked:   %name%:         De naam van de Minecraft speler waarvan het Discord account gekoppeld is.
-#                         %displayname%:  de weergavenaam van de Minecraft-speler waaraan het Discord-account van de gebruiker was gekoppeld
-#                         %uuid%:         het uuid van de Minecraft speler waarvan het Discord account gekoppeld is.
-# MinecraftAccountLinked: %id%:           Het Discord ID van de Discord gebruiker waarvan het Minecraft account gekoppeld is.
-#                         %username%:     Het Discord naam van de Discord gebruiker waarvan het Minecraft account gekoppeld is.
+# CodeGenerated:                %code%:         De code dat gegenereerd wordt voor de speler om zijn account te koppelen.
+#                               %botname%:      De naam van de bot in Discord.
+# DiscordAccountLinked:         %name%:         De naam van de Minecraft speler waarvan het Discord account gekoppeld is.
+#                               %displayname%:  de weergavenaam van de Minecraft-speler waaraan het Discord-account van de gebruiker was gekoppeld
+#                               %uuid%:         het uuid van de Minecraft speler waarvan het Discord account gekoppeld is.
+# DiscordAccountAlreadyLinked:  %uuid%:         de Minecraft-uuid van het gekoppelde Minecraft-account van de gebruiker
+#                               %username%:     de Minecraft-gebruikersnaam van het gekoppelde Minecraft-account van de gebruiker
+# DiscordLinkedAccountRequired  %message%:      het bericht dat de gebruiker niet kon verzenden omdat ze niet waren gekoppeld
+# MinecraftAccountLinked:       %id%:           Het Discord ID van de Discord gebruiker waarvan het Minecraft account gekoppeld is.
+#                               %username%:     Het Discord naam van de Discord gebruiker waarvan het Minecraft account gekoppeld is.
+# LinkedCommandSuccess:         %name%:         de Discord-gebruikersnaam van de Discord-gebruiker waaraan het Minecraft-account van de gebruiker is gekoppeld
+# UnlinkCommandSuccess:         %name%:         de Discord-gebruikersnaam van de Discord-gebruiker waaraan het Minecraft-account van de gebruiker was gekoppeld
+# MinecraftNobodyFound:         %target%:       de input die ertoe leidde dat er geen resultaten werden gevonden
 #
+# Discord
 CodeGenerated: "Je verbind code is %code%. PM de bot op Discord (%botname%) met alleen de code die je gegeven is, om je account te koppelen."
-ClickToCopyCode: "Klik om te kopiëren"
+UnknownCode: "Ik ken die code niet, probeer opnieuw."
+InvalidCode: "Weet je zeker dat dat je code is? De codes zijn 4 cijferss lang."
 DiscordAccountLinked: "Je Discord account is gekoppeld met %name% (%uuid%)"
+DiscordAccountAlreadyLinked: "U bent al gelinkt aan %username% (%uuid%)"
+DiscordLinkedAccountRequired: "Je hebt geprobeerd het volgende bericht te versturen maar je hebt je Minecraft account niet gekoppeld met je Discord account. koppel het door `/discord link` te typen. \n```%message%```"
+DiscordLinkedAccountCheckFailed: "Kan niet controleren of uw account is gekoppeld. Probeer het later opnieuw"
+# Minecraft
+ClickToCopyCode: "Klik om te kopiëren"
 MinecraftAccountLinked: "&bJe UUID is gekoppeld met Discord gebruiker %username% (%id%)"
+MinecraftAccountAlreadyLinked: "&bJe Minecraft account is al gekoppeld met een Discord account. Als je toestemming hebt kan je je account ontkoppelen met /discord unlink."
+LinkedCommandSuccess: "&bJe Minecraft is gekoppeld met %name%"
+UnlinkCommandSuccess: "&bJe Minecraft account is niet langer gekoppeld met %name%"
+MinecraftNoLinkedAccount: "&cJe Minecraft account is niet gekoppeld met een Discord account."
+LinkingError: "&cTijdelijk is het niet mogelijk om accounts te koppelen. Contact het administrator team."
+MinecraftNobodyFound: "&cNiemand gevonden met een Discord ID/Discord naam/Minecraft naam/Minecraft UUID daqt het zelfde is \"%target%\" om te zoeken. "

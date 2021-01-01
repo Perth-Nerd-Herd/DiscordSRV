@@ -18,9 +18,10 @@
 
 package github.scarsz.discordsrv.objects.log4j;
 
+import github.scarsz.configuralize.DynamicConfig;
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.objects.ConsoleMessage;
 import github.scarsz.discordsrv.util.DiscordUtil;
-import github.scarsz.discordsrv.util.LangUtil;
 import github.scarsz.discordsrv.util.TimeUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -32,7 +33,8 @@ import org.apache.logging.log4j.core.layout.PatternLayout;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 @Plugin(name = "DiscordSRV-ConsoleChannel", category = "Core", elementType = "appender", printObject = true)
 public class ConsoleAppender extends AbstractAppender {
@@ -61,8 +63,7 @@ public class ConsoleAppender extends AbstractAppender {
             try {
                 createdLayout = (PatternLayout) createLayoutMethod.invoke(null, args);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                DiscordSRV.error("Failed to reflectively invoke the Log4j createLayout method. The console appender is not going to function.");
-                e.printStackTrace();
+                DiscordSRV.error("Failed to reflectively invoke the Log4j createLayout method. The console appender is not going to function.", e);
             }
             PATTERN_LAYOUT = createdLayout;
         }
@@ -86,58 +87,49 @@ public class ConsoleAppender extends AbstractAppender {
     }
 
     @Override
-    public void append(LogEvent e) {
-        // return if console channel isn't available
-        if (DiscordSRV.getPlugin().getConsoleChannel() == null) return;
+    public void append(LogEvent event) {
+        final DiscordSRV plugin = DiscordSRV.getPlugin();
+
+        // return if console channel isn't available / is disabled
+        if (plugin.getConsoleChannel() == null) return;
+
+        final DynamicConfig config = DiscordSRV.config();
+        final String eventLevel = event.getLevel().name().toUpperCase();
 
         // return if this is not an okay level to send
         boolean isAnOkayLevel = false;
-        for (String consoleLevel : DiscordSRV.config().getStringList("DiscordConsoleChannelLevels")) if (consoleLevel.toLowerCase().equals(e.getLevel().name().toLowerCase())) isAnOkayLevel = true;
+        for (String enabledLevel : config.getStringList("DiscordConsoleChannelLevels")) {
+            if (eventLevel.equals(enabledLevel.toUpperCase())) {
+                isAnOkayLevel = true;
+                break;
+            }
+        }
         if (!isAnOkayLevel) return;
 
-        String line = e.getMessage().getFormattedMessage();
+        String line = event.getMessage().getFormattedMessage();
 
         // remove coloring
         line = DiscordUtil.aggressiveStrip(line);
+        line = DiscordUtil.strip(line);
 
         // do nothing if line is blank before parsing
         if (StringUtils.isBlank(line)) return;
 
         // apply regex to line
-        line = applyRegex(line);
-
-        // do nothing if line is blank after parsing
-        if (StringUtils.isBlank(line)) return;
+        for (Map.Entry<Pattern, String> entry : plugin.getConsoleRegexes().entrySet()) {
+            line = entry.getKey().matcher(line).replaceAll(entry.getValue());
+            if (StringUtils.isBlank(line)) return;
+        }
 
         // escape markdown
         line = DiscordUtil.escapeMarkdown(line);
 
-        // apply formatting
-        line = LangUtil.Message.CONSOLE_CHANNEL_LINE.toString()
-                .replace("%date%", TimeUtil.timeStamp())
-                .replace("%level%", e.getLevel().name().toUpperCase())
-                .replace("%line%", line)
-        ;
-
-        // if line contains a blocked phrase don't send it
-        boolean whitelist = DiscordSRV.config().getBoolean("DiscordConsoleChannelDoNotSendPhrasesActsAsWhitelist");
-        List<String> phrases = DiscordSRV.config().getStringList("DiscordConsoleChannelDoNotSendPhrases");
-        for (String phrase : phrases) {
-            boolean contained = StringUtils.containsIgnoreCase(line, phrase);
-            if (contained != whitelist) return;
-        }
+        // trim
+        line = line.trim();
 
         // queue final message
-        DiscordSRV.getPlugin().getConsoleMessageQueue().add(line);
-    }
-
-    private String applyRegex(String input) {
-        String regexFilter = DiscordSRV.config().getString("DiscordConsoleChannelRegexFilter");
-        if (StringUtils.isNotBlank(regexFilter)) {
-            return input.replaceAll(regexFilter, DiscordSRV.config().getString("DiscordConsoleChannelRegexReplacement"));
-        } else {
-            return input;
-        }
+        plugin.getConsoleMessageQueue()
+                .add(new ConsoleMessage(TimeUtil.timeStamp(), eventLevel, line));
     }
 
 }

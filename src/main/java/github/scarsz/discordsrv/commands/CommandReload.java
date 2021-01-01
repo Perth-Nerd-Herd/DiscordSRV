@@ -35,7 +35,9 @@ public class CommandReload {
         DiscordSRV.getPlugin().reloadConfig();
         DiscordSRV.getPlugin().reloadCancellationDetector();
         DiscordSRV.getPlugin().reloadChannels();
+        DiscordSRV.getPlugin().reloadRegexes();
         DiscordSRV.getPlugin().reloadColors();
+        if (DiscordSRV.getPlugin().getAlertListener() != null) DiscordSRV.getPlugin().getAlertListener().reloadAlerts();
 
         // Check if update checks became enabled
         if (!DiscordSRV.isUpdateCheckDisabled() && !DiscordSRV.updateChecked) {
@@ -45,7 +47,7 @@ public class CommandReload {
 
         sender.sendMessage(ChatColor.AQUA + LangUtil.InternalMessage.RELOADED.toString());
 
-        if (!DiscordSRV.getPlugin().isEnabled()) return; // incase update check disabled it
+        if (!DiscordSRV.getPlugin().isEnabled()) return; // in case update check disabled it
         DiscordSRV.api.callEvent(new ConfigReloadedEvent(sender));
     }
 

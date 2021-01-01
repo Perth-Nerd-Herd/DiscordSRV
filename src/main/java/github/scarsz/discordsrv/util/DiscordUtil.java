@@ -31,11 +31,14 @@ import net.dv8tion.jda.api.events.role.update.RoleUpdateNameEvent;
 import net.dv8tion.jda.api.events.user.update.UserUpdateNameEvent;
 import net.dv8tion.jda.api.exceptions.PermissionException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.requests.restaction.MessageAction;
 import org.apache.commons.lang3.StringUtils;
 import org.bukkit.ChatColor;
+import org.jetbrains.annotations.ApiStatus;
 
-import java.awt.Color;
+import java.awt.*;
 import java.io.File;
+import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -189,13 +192,13 @@ public class DiscordUtil {
     /**
      * regex-powered stripping pattern, see https://regex101.com/r/IzirAR/2 for explanation
      */
-    private static final Pattern stripPattern = Pattern.compile("(?<!@)[&§](?i)[0-9a-fklmnor]");
-    private static final Pattern stripSectionOnlyPattern = Pattern.compile("(?<!@)§(?i)[0-9a-fklmnor]");
+    private static final Pattern stripPattern = Pattern.compile("(?<!@)[&§](?i)[0-9a-fklmnorx]");
+    private static final Pattern stripSectionOnlyPattern = Pattern.compile("(?<!@)§(?i)[0-9a-fklmnorx]");
 
     /**
-     * regex-powered aggressive stripping pattern, see https://regex101.com/r/mW8OlT for explanation
+     * regex-powered aggressive stripping pattern, see https://regex101.com/r/pQNGzA for explanation
      */
-    private static final Pattern aggressiveStripPattern = Pattern.compile("\\[m|\\[([0-9]{1,2}[;m]?){3}|\u001B+");
+    private static final Pattern aggressiveStripPattern = Pattern.compile("\u001B(?:\\[0?m|\\[38;2(?:;\\d{1,3}){3}m|\\[([0-9]{1,2}[;m]?){3})");
 
     /**
      * Strip the given String of Minecraft coloring. Useful for sending things to Discord.
@@ -287,12 +290,14 @@ public class DiscordUtil {
         }
 
         message = DiscordUtil.strip(message);
-        if (editMessage) {
-            message = DiscordUtil.cutPhrases(message);
-        }
 
         String overflow = null;
         int maxLength = Message.MAX_CONTENT_LENGTH;
+        //noinspection ConstantConditions
+        if (maxLength != 2000) {
+            DiscordSRV.error("Message#MAX_CONTENT_LENGTH != 2000????? Is actually: " + maxLength);
+            maxLength = 2000;
+        }
         if (message.length() > maxLength) {
             DiscordSRV.debug("Tried sending message with length of " + message.length() + " (" + (message.length() - maxLength) + " over limit)");
             overflow = message.substring(maxLength);
@@ -301,26 +306,16 @@ public class DiscordUtil {
 
         queueMessage(channel, message, m -> {
             if (expiration > 0) {
-                try { Thread.sleep(expiration); } catch (InterruptedException e) { e.printStackTrace(); }
+                try { Thread.sleep(expiration); } catch (InterruptedException ignored) {}
                 deleteMessage(m);
             }
         });
         if (overflow != null) sendMessage(channel, overflow, expiration, editMessage);
     }
 
+    @Deprecated
+    @ApiStatus.ScheduledForRemoval
     public static String cutPhrases(String message) {
-        if (DiscordSRV.config().getStringList("DiscordChatChannelCutPhrases").size() > 0) {
-            int changes;
-            do {
-                changes = 0;
-                String before = message;
-                for (String phrase : DiscordSRV.config().getStringList("DiscordChatChannelCutPhrases")) {
-                    // case insensitive String#replace(phrase, "")
-                    message = message.replaceAll("(?i)" + Pattern.quote(phrase), "");
-                    changes += before.length() - message.length();
-                }
-            } while (changes > 0); // keep cutting until there are no changes
-        }
         return message;
     }
 
@@ -427,7 +422,22 @@ public class DiscordUtil {
         }
 
         message = translateEmotes(message, channel.getGuild());
-        queueMessage(channel, new MessageBuilder().append(message).build());
+        queueMessage(channel, new MessageBuilder().append(message).build(), false);
+    }
+    /**
+     * Send the given message to the given channel
+     * @param channel The channel to send the message to
+     * @param message The message to send to the channel
+     * @param allowMassPing Whether or not to deny @everyone/@here pings
+     */
+    public static void queueMessage(TextChannel channel, String message, boolean allowMassPing) {
+        if (channel == null) {
+            DiscordSRV.debug("Tried sending a message to a null channel");
+            return;
+        }
+
+        message = translateEmotes(message, channel.getGuild());
+        queueMessage(channel, new MessageBuilder().append(message).build(), allowMassPing);
     }
     /**
      * Send the given message to the given channel
@@ -436,6 +446,15 @@ public class DiscordUtil {
      */
     public static void queueMessage(TextChannel channel, Message message) {
         queueMessage(channel, message, null);
+    }
+    /**
+     * Send the given message to the given channel
+     * @param channel The channel to send the message to
+     * @param message The message to send to the channel
+     * @param allowMassPing Whether or not to deny @everyone/@here pings
+     */
+    public static void queueMessage(TextChannel channel, Message message, boolean allowMassPing) {
+        queueMessage(channel, message, null, allowMassPing);
     }
     /**
      * Send the given message to the given channel, optionally doing something with the message via the given consumer
@@ -452,15 +471,37 @@ public class DiscordUtil {
      * @param channel The channel to send the message to
      * @param message The message to send to the channel
      * @param consumer The consumer to handle the message
+     * @param allowMassPing Whether or not to deny @everyone/@here pings
+     */
+    public static void queueMessage(TextChannel channel, String message, Consumer<Message> consumer, boolean allowMassPing) {
+        message = translateEmotes(message, channel.getGuild());
+        queueMessage(channel, new MessageBuilder().append(message).build(), consumer, allowMassPing);
+    }
+    /**
+     * Send the given message to the given channel, optionally doing something with the message via the given consumer
+     * @param channel The channel to send the message to
+     * @param message The message to send to the channel
+     * @param consumer The consumer to handle the message
      */
     public static void queueMessage(TextChannel channel, Message message, Consumer<Message> consumer) {
+        queueMessage(channel, message, consumer, false);
+    }
+    /**
+     * Send the given message to the given channel, optionally doing something with the message via the given consumer
+     * @param channel The channel to send the message to
+     * @param message The message to send to the channel
+     * @param consumer The consumer to handle the message
+     */
+    public static void queueMessage(TextChannel channel, Message message, Consumer<Message> consumer, boolean allowMassPing) {
         if (channel == null) {
             DiscordSRV.debug("Tried sending a message to a null channel");
             return;
         }
 
         try {
-            channel.sendMessage(message).queue(sentMessage -> {
+            MessageAction action = channel.sendMessage(message);
+            if (allowMassPing) action = action.allowedMentions(EnumSet.allOf(Message.MentionType.class));
+            action.queue(sentMessage -> {
                 DiscordSRV.api.callEvent(new DiscordGuildMessageSentEvent(getJda(), sentMessage));
                 if (consumer != null) consumer.accept(sentMessage);
             }, throwable -> DiscordSRV.error("Failed to send message to channel " + channel + ": " + throwable.getMessage()));
@@ -807,6 +848,9 @@ public class DiscordUtil {
         }
     }
 
+    public static String translateEmotes(String messageToTranslate) {
+        return translateEmotes(messageToTranslate, getJda().getEmotes());
+    }
     public static String translateEmotes(String messageToTranslate, Guild guild) {
         return translateEmotes(messageToTranslate, guild.getEmotes());
     }

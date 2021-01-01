@@ -19,6 +19,7 @@
 package github.scarsz.discordsrv.listeners;
 
 import com.vdurmont.emoji.EmojiParser;
+import dev.vankka.mcdiscordreserializer.minecraft.MinecraftSerializer;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.events.DiscordGuildMessagePostProcessEvent;
 import github.scarsz.discordsrv.api.events.DiscordGuildMessagePreProcessEvent;
@@ -32,6 +33,8 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.kyori.text.Component;
+import net.kyori.text.serializer.legacy.LegacyComponentSerializer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
@@ -42,6 +45,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class DiscordChatListener extends ListenerAdapter {
@@ -80,15 +84,15 @@ public class DiscordChatListener extends ListenerAdapter {
         // enforce required account linking
         if (DiscordSRV.config().getBoolean("DiscordChatChannelRequireLinkedAccount")) {
             if (DiscordSRV.getPlugin().getAccountLinkManager() == null) {
-                event.getAuthor().openPrivateChannel().queue(privateChannel -> privateChannel.sendMessage(LangUtil.InternalMessage.FAILED_TO_CHECK_LINKED_ACCOUNT.toString()).queue());
+                event.getAuthor().openPrivateChannel().queue(privateChannel -> privateChannel.sendMessage(LangUtil.Message.FAILED_TO_CHECK_LINKED_ACCOUNT.toString()).queue());
                 DiscordUtil.deleteMessage(event.getMessage());
                 return;
             }
 
             boolean hasLinkedAccount = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getAuthor().getId()) != null;
             if (!hasLinkedAccount && !event.getAuthor().isBot()) {
-                event.getAuthor().openPrivateChannel().queue(privateChannel -> privateChannel.sendMessage(LangUtil.InternalMessage.LINKED_ACCOUNT_REQUIRED.toString()
-                        .replace("{message}", event.getMessage().getContentRaw())
+                event.getAuthor().openPrivateChannel().queue(privateChannel -> privateChannel.sendMessage(LangUtil.Message.LINKED_ACCOUNT_REQUIRED.toString()
+                        .replace("%message%", event.getMessage().getContentRaw())
                 ).queue());
                 DiscordUtil.deleteMessage(event.getMessage());
                 return;
@@ -153,11 +157,11 @@ public class DiscordChatListener extends ListenerAdapter {
             if (StringUtils.isBlank(event.getMessage().getContentRaw())) return;
         }
 
-        // if message contains a string that's suppose to make the entire message not be sent to discord, return
-        for (String phrase : DiscordSRV.config().getStringList("DiscordChatChannelBlockedPhrases")) {
-            if (StringUtils.isEmpty(phrase)) continue; // don't want to block every message from sending
-            if (event.getMessage().getContentRaw().contains(phrase)) {
-                DiscordSRV.debug("Received message from Discord that contained a block phrase (" + phrase + "), message send aborted");
+        // apply regex filters
+        for (Map.Entry<Pattern, String> entry : DiscordSRV.getPlugin().getDiscordRegexes().entrySet()) {
+            message = entry.getKey().matcher(message).replaceAll(entry.getValue());
+            if (StringUtils.isBlank(message)) {
+                DiscordSRV.debug("Not processing Discord message because it was cleared by a filter: " + entry.getKey().pattern());
                 return;
             }
         }
@@ -169,7 +173,7 @@ public class DiscordChatListener extends ListenerAdapter {
 
         // strip colors if role doesn't have permission
         List<String> rolesAllowedToColor = DiscordSRV.config().getStringList("DiscordChatChannelRolesAllowedToUseColorCodesInChat");
-        boolean shouldStripColors = true;
+        boolean shouldStripColors = !rolesAllowedToColor.contains("@everyone");
         for (Role role : event.getMember().getRoles())
             if (rolesAllowedToColor.contains(role.getName())) shouldStripColors = false;
         if (shouldStripColors) message = DiscordUtil.strip(message);
@@ -179,6 +183,10 @@ public class DiscordChatListener extends ListenerAdapter {
                 ? LangUtil.Message.CHAT_TO_MINECRAFT.toString()
                 : LangUtil.Message.CHAT_TO_MINECRAFT_NO_ROLE.toString();
 
+        if (DiscordSRV.config().getBoolean("Experiment_MCDiscordReserializer_ToMinecraft")) {
+            Component component = MinecraftSerializer.INSTANCE.serialize(message);
+            message = LegacyComponentSerializer.INSTANCE.serialize(component);
+        }
         String finalMessage = message != null ? message : "<blank message>";
         formatMessage = replacePlaceholders(formatMessage, event, selectedRoles, finalMessage);
 
@@ -223,19 +231,21 @@ public class DiscordChatListener extends ListenerAdapter {
                     chatFormat = PlaceholderUtil.replacePlaceholders(chatFormat);
                     nameFormat = PlaceholderUtil.replacePlaceholders(nameFormat);
 
-                    String regex = DiscordSRV.config().getString("DiscordChatChannelRegex");
-                    if (StringUtils.isNotBlank(regex)) {
-                        String replacement = DiscordSRV.config().getString("DiscordChatChannelRegexReplacement");
-                        chatFormat = chatFormat.replaceAll(regex, replacement);
-                        nameFormat = nameFormat.replaceAll(regex, replacement);
+                    // apply regex filters
+                    for (Map.Entry<Pattern, String> entry : DiscordSRV.getPlugin().getDiscordRegexes().entrySet()) {
+                        chatFormat = entry.getKey().matcher(chatFormat).replaceAll(entry.getValue());
+                        nameFormat = entry.getKey().matcher(nameFormat).replaceAll(entry.getValue());
                     }
 
                     nameFormat = DiscordUtil.strip(nameFormat);
-
                     dynmapHook.broadcastMessageToDynmap(nameFormat, chatFormat);
         });
 
-        DiscordSRV.getPlugin().broadcastMessageToMinecraftServer(DiscordSRV.getPlugin().getDestinationGameChannelNameForTextChannel(event.getChannel()), postEvent.getProcessedMessage(), event.getAuthor());
+        DiscordSRV.getPlugin().broadcastMessageToMinecraftServer(
+                DiscordSRV.getPlugin().getDestinationGameChannelNameForTextChannel(event.getChannel()),
+                postEvent.getProcessedMessage(),
+                event.getAuthor()
+        );
 
         if (DiscordSRV.config().getBoolean("DiscordChatChannelBroadcastDiscordMessagesToConsole")) {
             DiscordSRV.info(LangUtil.InternalMessage.CHAT + ": " + DiscordUtil.strip(postEvent.getProcessedMessage().replace("»", ">")));
@@ -243,17 +253,17 @@ public class DiscordChatListener extends ListenerAdapter {
     }
 
     private String replacePlaceholders(String input, GuildMessageReceivedEvent event, List<Role> selectedRoles, String message) {
-        return input.replace("%message%", message)
-                .replace("%channelname%", event.getChannel().getName())
+        return input.replace("%channelname%", event.getChannel().getName())
                 .replace("%name%", DiscordUtil.strip(event.getMember().getEffectiveName()))
                 .replace("%username%", DiscordUtil.strip(event.getMember().getUser().getName()))
                 .replace("%toprole%", DiscordUtil.getRoleName(!selectedRoles.isEmpty() ? selectedRoles.get(0) : null))
                 .replace("%toproleinitial%", !selectedRoles.isEmpty() ? DiscordUtil.getRoleName(selectedRoles.get(0)).substring(0, 1) : "")
                 .replace("%toprolecolor%", DiscordUtil.convertRoleToMinecraftColor(!selectedRoles.isEmpty() ? selectedRoles.get(0) : null))
                 .replace("%allroles%", DiscordUtil.getFormattedRoles(selectedRoles))
-                .replace("\\~", "~") // get rid of badly escaped characters
-                .replace("\\*", "") // get rid of badly escaped characters
-                .replace("\\_", "_"); // get rid of badly escaped characters
+                .replace("\\~", "~") // get rid of escaped characters, since Minecraft doesn't use markdown
+                .replace("\\*", "") // get rid of escaped characters, since Minecraft doesn't use markdown
+                .replace("\\_", "_") // get rid of escaped characters, since Minecraft doesn't use markdown
+                .replace("%message%", message);
     }
 
     private boolean processPlayerListCommand(GuildMessageReceivedEvent event, String message) {
@@ -298,10 +308,8 @@ public class DiscordChatListener extends ListenerAdapter {
         if (DiscordSRV.config().getInt("DiscordChatChannelListCommandExpiration") > 0 && DiscordSRV.config().getBoolean("DiscordChatChannelListCommandExpirationDeleteRequest")) {
             new Thread(() -> {
                 try {
-                    Thread.sleep(DiscordSRV.config().getInt("DiscordChatChannelListCommandExpiration") * 1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+                    Thread.sleep(DiscordSRV.config().getInt("DiscordChatChannelListCommandExpiration") * 1000L);
+                } catch (InterruptedException ignored) {}
                 DiscordUtil.deleteMessage(event.getMessage());
             }).start();
         }

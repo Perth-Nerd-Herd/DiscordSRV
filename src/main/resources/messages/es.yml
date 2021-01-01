@@ -23,8 +23,8 @@
 #
 # DiscordToMinecraftAllRolesSeparator: el separador utilizado entre los roles en %allroles%
 #
-DiscordToMinecraftChatMessageFormat: "[&bDiscord &r| %toprolecolor%%toprole%&r] %username% » %message%"
-DiscordToMinecraftChatMessageFormatNoRole: "[&bDiscord&r] %username% » %message%"
+DiscordToMinecraftChatMessageFormat: "[&bDiscord &r| %toprolecolor%%toprole%&r] %name% » %message%"
+DiscordToMinecraftChatMessageFormatNoRole: "[&bDiscord&r] %name% » %message%"
 DiscordToMinecraftAllRolesSeparator: " | "
 
 # Minecraft -> Discord mensaje
@@ -38,6 +38,10 @@ DiscordToMinecraftAllRolesSeparator: " | "
 #                  ejemplo: jeb_
 # %displayname%:  muestra el nombre modificado
 #                  ejemplo: BigBossManJeb
+# %usernamenoescapes%:     nombre original del jugador sin escapar del formato de discordia (para usar en código en línea y reducción de bloque de código)
+#                  example: jeb_
+# %displaynamenoescapes%:  muestra el nombre modificado sin escapar del formato de discordia (para usar en código en línea y reducción de bloque de código)
+#                  example: BigBossManJeb
 # %message%:      Contenido del mensaje
 #                  ejemplo: Hello!
 # %primarygroup%: el nombre del grupo primario del usuario
@@ -101,8 +105,14 @@ DynmapDiscordFormat: "[Dynmap] %name% » %message%"
 #           ejemplo: INFO, WARN, ERROR
 # %line%:  línea desde la consola
 #           ejemplo: [DiscordSRV] Enabling DiscordSRV vX.Y
+# Los PlaceholderAPI placeholders también son compatibles
+#
+# DiscordConsoleChannelMessagePrefix: El prefijo literal para anteponer a un lote de líneas.
+# DiscordConsoleChannelMessageSuffix: El sufijo literal para agregar a un lote de líneas.
 #
 DiscordConsoleChannelFormat: "[%date% %level%] %line%"
+DiscordConsoleChannelMessagePrefix: ""
+DiscordConsoleChannelMessageSuffix: ""
 
 # Mensaje de error del comando !c desde el chat de Discord
 # Se usa cuando ocurre un error con permisos para que el jugador ejecute el comando, no es un error ejecutando el comando
@@ -143,7 +153,7 @@ DiscordChatChannelListCommandAllPlayersSeparator: ", "
 # Fields:     el formato es "título;valor;inline" (p.ej. "Quien se unio?;%displayname%;true") o "blanco" para agregar un campo en blanco
 # Timestamp:  establecido en verdadero para usar la hora en que se envió el mensaje o usar una marca de tiempo de época para una hora específica (https://www.epochconverter.com/)
 #
-# Marcadores de posición disponibles para PlayerJoin/PlayerFirstJoin/PlayerLeave/PlayerDeath:
+# Marcadores de posición disponibles para PlayerJoin/PlayerFirstJoin/PlayerLeave/PlayerDeath/PlayerAchievement:
 # %displayname%:         muestra el nombre modificado
 # %username%:            nombre original del jugador
 # %date%:                fecha & tiempo actual
@@ -163,6 +173,7 @@ MinecraftPlayerJoinMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#00ff00"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -191,6 +202,7 @@ MinecraftPlayerFirstJoinMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#ffd700"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -219,6 +231,7 @@ MinecraftPlayerLeaveMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#ff0000"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -248,6 +261,7 @@ MinecraftPlayerDeathMessage:
     Name: "%botname%"
   Content: ""
   Embed:
+    Enabled: true
     Color: "#000000"
     Author:
       ImageUrl: "%embedavatarurl%"
@@ -264,18 +278,36 @@ MinecraftPlayerDeathMessage:
       Text: ""
       IconUrl: ""
     Timestamp: false
-
-# Minecraft -> Mensaje de Discord de logros
 #
-# Variables disponibles:
+# Variables disponibles para mensaje de PlayerAchievement:
 # %achievement%: contenido del mensaje
-# %displayname%: muestra el nombre modificado
-# %username%:    nombre original del jugador
 # %world%:       nombre del mundo en que está el usuario
-# %date%:        fecha & tiempo actual
-# Los PlaceholderAPI placeholders tambien son compatibles
 #
-MinecraftPlayerAchievementMessagesFormat: ":medal: **%displayname% ha conseguido el progreso %achievement%!**"
+MinecraftPlayerAchievementMessage:
+  Enabled: true
+  Webhook:
+    Enable: false
+    AvatarUrl: "%botavatarurl%"
+    Name: "%botname%"
+  Content: ""
+  Embed:
+    Enabled: true
+    Color: "#ffd700"
+    Author:
+      ImageUrl: "%embedavatarurl%"
+      Name: "%displayname% ha conseguido el progreso %achievement%!"
+      Url: ""
+    ThumbnailUrl: ""
+    Title:
+      Text: ""
+      Url: ""
+    Description: ""
+    Fields: []
+    ImageUrl: ""
+    Footer:
+      Text: ""
+      IconUrl: ""
+    Timestamp: false
 
 # Mensajes de actualización del tema del canal
 # Esto es todo lo relacionado con la actualización automática de los temas del chat o del canal de la consola con información del servidor
@@ -315,6 +347,12 @@ ChannelTopicUpdaterConsoleChannelTopicAtServerShutdownFormat: "El servidor está
 #
 DiscordCommandFormat: "&bÚnete a nuestro servidor de Discord {INVITE}. Para ayuda con los comandos, ejecute \"/discord ?\""
 
+# Sin formato de mensaje de permiso
+NoPermissionMessage: "&cFalta el formato del mensaje de permiso"
+
+# Mensaje de comando desconocido
+UnknownCommandMessage: "&bEste comando no existe"
+
 # Mensajes de inicio/apagado del servidor
 # DiscordChatChannelServerStartupMessage: mensaje que se enviará cuando el servidor se inicie; dejar en blanco para deshabilitar
 # DiscordChatChannelServerShutdownMessage: mensaje que se enviará cuando el servidor se apague; dejar en blanco para deshabilitar
@@ -339,15 +377,32 @@ ServerWatchdogMessage: "`%date%` %guildowner%, la sala de servidores está encen
 # Estos son mensajes utilizados cuando las cuentas están vinculadas
 #
 # Variables disponibles:
-# CodeGenerated:          %code%:         el código generado para que el jugador vincule su cuenta
-#                         %botname%:      el nombre del bot en Discord
-# DiscordAccountLinked:   %name%:         el nombre del jugador de Minecraft al que estaba vinculada la cuenta de Discord
-#                         %displayname%:  el nombre para mostrar del reproductor de Minecraft al que se vinculó la cuenta Discord del usuario
-#                         %uuid%:         uuid del jugador de Minecraft al que estaba vinculada la cuenta de Discord
-# MinecraftAccountLinked: %id%:           el ID de Discord del usuario al que estaba vinculada la cuenta de Minecraft
-#                         %username%:     el nombre de Discord del usuario al que estaba vinculada la cuenta de Minecraft
+# CodeGenerated:                %code%:         el código generado para que el jugador vincule su cuenta
+#                               %botname%:      el nombre del bot en Discord
+# DiscordAccountLinked:         %name%:         el nombre del jugador de Minecraft al que estaba vinculada la cuenta de Discord
+#                               %displayname%:  el nombre para mostrar del reproductor de Minecraft al que se vinculó la cuenta Discord del usuario
+#                               %uuid%:         uuid del jugador de Minecraft al que estaba vinculada la cuenta de Discord
+# DiscordAccountAlreadyLinked:  %uuid%:         el uuid de Minecraft de la cuenta de Minecraft vinculada del usuario
+#                               %username%:     el nombre de usuario de Minecraft de la cuenta de Minecraft vinculada del usuario
+# DiscordLinkedAccountRequired  %message%:      el mensaje que el usuario no pudo enviar porque no estaba vinculado
+# MinecraftAccountLinked:       %id%:           el ID de Discord del usuario al que estaba vinculada la cuenta de Minecraft
+#                               %username%:     el nombre de Discord del usuario al que estaba vinculada la cuenta de Minecraft
+# LinkedCommandSuccess:         %name%:         el nombre de usuario de Discord del usuario de Discord al que está vinculada la cuenta de Minecraft del usuario
+# UnlinkCommandSuccess:         %name%:         el nombre de usuario de Discord del usuario de Discord al que estaba vinculada la cuenta de Minecraft del usuario
 #
+# Discord
 CodeGenerated: "Su código de vinculación es %code%. Envíele un MP al bot (%botname%) en Discord, incluyendo solamente el código de vinculación."
-ClickToCopyCode: "Haga clic para copiar"
+UnknownCode: "No conozco ese código, inténtelo de nuevo."
+InvalidCode: "¿Estás seguro de que ese es tu código? Los códigos de enlace tienen 4 números de largo"
 DiscordAccountLinked: "Su cuenta de Discord ha sido vinculada a %name% (%uuid%)"
+DiscordAccountAlreadyLinked: "Ya estás vinculado a %username% (%uuid%)"
+DiscordLinkedAccountRequired: "Intentaste decir el siguiente mensaje en el chat del juego, pero este servidor requiere que tenga su cuenta de Minecraft vinculada a su cuenta de Discord. Vincúlelo en el juego ejecutando `/discord link`. \n```%message%```"
+DiscordLinkedAccountCheckFailed: "No se puede verificar si su cuenta está vinculada, vuelva a intentarlo más tarde"
+# Minecraft
+ClickToCopyCode: "Haga clic para copiar"
 MinecraftAccountLinked: "&bSu UUID ha sido vinculado al usuario de Discord %username% (%id%)"
+MinecraftAccountAlreadyLinked: "&bSu cuenta de Minecraft ya está asociada a una cuenta Discord. Si tiene permiso, puede desvincular su cuenta con /discord unlink."
+LinkedCommandSuccess: "&bTu cuenta de Minecraft está asociada con %name%"
+UnlinkCommandSuccess: "&bTu cuenta de Minecraft ya no está asociada con %name%"
+MinecraftNoLinkedAccount: "&cTu cuenta de Minecraft no está asociada con una cuenta de Discord"
+MinecraftNobodyFound: "&cNo se encontrá a nadie con Discord ID/nombre de Discord/nombre de Minecraft/Minecraft UUID que coincida con \"%target%\" para buscar"

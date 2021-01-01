@@ -18,13 +18,11 @@
 
 package github.scarsz.discordsrv.util;
 
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.Unirest;
+import com.github.kevinsawicki.http.HttpRequest;
 import github.scarsz.discordsrv.DiscordSRV;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.json.JSONArray;
@@ -57,9 +55,7 @@ public class WebhookUtil {
             }
         } catch (Exception e) {
             DiscordSRV.warning("Failed to purge already existing webhooks: " + e.getMessage());
-            if (DiscordSRV.config().getInt("DebugLevel") > 0) {
-                e.printStackTrace();
-            }
+            if (DiscordSRV.config().getInt("DebugLevel") > 0) DiscordSRV.error(e);
         }
     }
 
@@ -70,6 +66,8 @@ public class WebhookUtil {
     public static void deliverMessage(TextChannel channel, Player player, String message, MessageEmbed embed) {
         Bukkit.getScheduler().runTaskAsynchronously(DiscordSRV.getPlugin(), () -> {
             String avatarUrl = DiscordSRV.config().getString("Experiment_EmbedAvatarUrl");
+            avatarUrl = PlaceholderUtil.replacePlaceholders(avatarUrl, player);
+
             String username = DiscordSRV.config().getString("Experiment_WebhookChatMessageUsernameFormat")
                     .replace("%displayname%", DiscordUtil.strip(player.getDisplayName()))
                     .replace("%username%", player.getName());
@@ -89,6 +87,7 @@ public class WebhookUtil {
 
             if (StringUtils.isBlank(avatarUrl)) avatarUrl = "https://minotar.net/helm/{uuid-nodashes}/{size}";
             avatarUrl = avatarUrl
+                    .replace("{timestamp}", String.valueOf(System.currentTimeMillis() / 1000))
                     .replace("{username}", player.getName())
                     .replace("{uuid}", player.getUniqueId().toString())
                     .replace("{uuid-nodashes}", player.getUniqueId().toString().replace("-", ""))
@@ -111,7 +110,8 @@ public class WebhookUtil {
         Bukkit.getScheduler().runTaskAsynchronously(DiscordSRV.getPlugin(), () -> {
             try {
                 JSONObject jsonObject = new JSONObject();
-                jsonObject.put("username", webhookName);
+                // workaround for a Discord block for using 'Clyde' in usernames
+                jsonObject.put("username", webhookName.replaceAll("(?:(?i)c)l(?:(?i)yde)", "$1I$2").replaceAll("(?i)(clyd)e", "$13"));
                 jsonObject.put("avatar_url", webhookAvatarUrl);
 
                 if (StringUtils.isNotBlank(message)) jsonObject.put("content", message);
@@ -121,11 +121,12 @@ public class WebhookUtil {
                     jsonObject.put("embeds", jsonArray);
                 }
 
-                HttpResponse<String> response = Unirest.post(webhookUrl)
+                HttpRequest request = HttpRequest.post(webhookUrl)
                         .header("Content-Type", "application/json")
-                        .body(jsonObject)
-                        .asString();
-                int status = response.getStatus();
+                        .userAgent("DiscordSRV/" + DiscordSRV.getPlugin().getDescription().getVersion())
+                        .send(jsonObject.toString());
+
+                int status = request.code();
                 if (status == 404) {
                     // 404 = Invalid Webhook (most likely to have been deleted)
                     DiscordSRV.debug("Webhook delivery returned 404, marking webhooks url's as invalid to let them regenerate" + (allowSecondAttempt ? " & trying again" : ""));
@@ -133,11 +134,27 @@ public class WebhookUtil {
                     if (allowSecondAttempt) deliverMessage(channel, webhookName, webhookAvatarUrl, message, embed, false);
                     return;
                 }
-                DiscordSRV.debug("Received API response for webhook message delivery: " + response.getStatus());
+                String body = request.body();
+                try {
+                    JSONObject jsonObj = new JSONObject(body);
+                    if (jsonObj.has("code")) {
+                        // 10015 = unknown webhook, https://discord.com/developers/docs/topics/opcodes-and-status-codes#json-json-error-codes
+                        if (jsonObj.getInt("code") == 10015) {
+                            DiscordSRV.debug("Webhook delivery returned 10015 (Unknown Webhook), marking webhooks url's as invalid to let them regenerate" + (allowSecondAttempt ? " & trying again" : ""));
+                            invalidWebhookUrlForChannel(channel); // tell it to get rid of the urls & get new ones
+                            if (allowSecondAttempt) deliverMessage(channel, webhookName, webhookAvatarUrl, message, embed, false);
+                            return;
+                        }
+                    }
+                } catch (Throwable ignored) {}
+                if (status == 204) {
+                    DiscordSRV.debug("Received API response for webhook message delivery: " + status);
+                } else {
+                    DiscordSRV.debug("Received unexpected API response for webhook message delivery: " + status + " for request: " + jsonObject.toString() + ", response: " + body);
+                }
             } catch (Exception e) {
                 DiscordSRV.error("Failed to deliver webhook message to Discord: " + e.getMessage());
-                DiscordSRV.debug(ExceptionUtils.getMessage(e));
-                e.printStackTrace();
+                DiscordSRV.debug(e);
             }
         });
     }
